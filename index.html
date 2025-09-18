@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Chrono Break</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +35,9 @@
         #game-container {
             position: relative;
             width: 100%;
-            max-width: 1000px;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 675px; /* 16:9 Aspect Ratio */
             aspect-ratio: 16 / 9;
             box-shadow: 0 0 35px var(--primary-glow), 0 0 15px var(--secondary-glow) inset;
             border: 2px solid var(--border-color);
@@ -228,6 +230,124 @@
             cursor: pointer;
         }
 
+        #pause-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            z-index: 11;
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        #pause-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #pause-overlay button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5em;
+            font-weight: 700;
+            padding: 15px 30px;
+            margin-top: 20px;
+            border: 2px solid var(--primary-glow);
+            border-radius: 10px;
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--primary-glow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px var(--primary-glow);
+            box-shadow: 0 0 10px var(--primary-glow) inset, 0 0 5px var(--primary-glow);
+        }
+
+        #pause-overlay button:hover {
+            background: rgba(0, 255, 255, 0.3);
+            color: white;
+            box-shadow: 0 0 20px var(--primary-glow) inset, 0 0 15px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        body.is-mobile #mobile-controls {
+            display: block;
+        }
+
+        #joystick-area {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            pointer-events: auto;
+        }
+        #joystick-thumb {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            top: 40px;
+            left: 40px;
+            border: 2px solid var(--primary-glow);
+        }
+
+        #actions-area {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .action-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid var(--primary-glow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary-glow);
+            font-size: 0.8em;
+            text-shadow: 0 0 5px var(--primary-glow);
+        }
+
+        @media (max-width: 768px) {
+            #game-overlay h1 { font-size: 3em; }
+            #game-overlay p { font-size: 1em; max-width: 85%; }
+            #game-overlay button { font-size: 1.2em; }
+            #score, #wave { font-size: 1.5em; }
+        }
+
     </style>
 </head>
 <body>
@@ -263,6 +383,20 @@
             <button id="start-button">INICIAR SIMULACIÓN</button>
             <div id="final-score" style="display:none; font-size: 2em; margin-top: 20px;"></div>
         </div>
+        <div id="pause-overlay">
+            <h1>PAUSA</h1>
+            <button id="resume-button">REANUDAR</button>
+            <button id="exit-button">SALIR AL MENÚ</button>
+        </div>
+        <div id="mobile-controls">
+             <div id="joystick-area">
+                <div id="joystick-thumb"></div>
+            </div>
+            <div id="actions-area">
+                <div id="chrono-button" class="action-button">CHRONO</div>
+                <div id="shoot-button" class="action-button">FUEGO</div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -275,11 +409,23 @@
         const gameContainer = document.getElementById('game-container');
         
         let width, height;
+        const stars = [];
 
         function resizeCanvas() {
             const rect = gameContainer.getBoundingClientRect();
             width = gameCanvas.width = bgCanvas.width = rect.width;
             height = gameCanvas.height = bgCanvas.height = rect.height;
+            
+            // Re-initialize stars on resize
+            stars.length = 0;
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 0.2 + 0.1
+                });
+            }
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
@@ -296,35 +442,133 @@
         const finalScoreEl = document.getElementById('final-score');
         const controlsInfo = document.getElementById('controls-info');
         const aiToggle = document.getElementById('ai-toggle');
+        const pauseOverlay = document.getElementById('pause-overlay');
+        const resumeButton = document.getElementById('resume-button');
+        const exitButton = document.getElementById('exit-button');
+        
+        // Mobile Controls
+        const joystickArea = document.getElementById('joystick-area');
+        const joystickThumb = document.getElementById('joystick-thumb');
+        const shootButton = document.getElementById('shoot-button');
+        const chronoButton = document.getElementById('chrono-button');
+
 
         // <!-- Game State -->
-        let gameState = 'start'; // 'start', 'playing', 'gameover'
+        let gameState = 'start'; // 'start', 'playing', 'gameover', 'paused'
         let isAIActive = false;
         let score = 0;
         let wave = 1;
         let gameTime = 0;
         let timeScale = 1;
         let lastTime = 0;
+        const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
         // Input Handling
         const keys = {};
         const mouse = { x: 0, y: 0, down: false, rightDown: false };
-        window.addEventListener('keydown', e => keys[e.code] = true);
+        const joystick = { active: false, x: 0, y: 0, touchId: null, originX: 0, originY: 0 };
+
+        if (isMobile) {
+            document.body.classList.add('is-mobile');
+            controlsInfo.innerHTML = `<span>Joystick</span> Moverse | <span>Botones</span> Acción`;
+        }
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (e.code === 'KeyP' && (gameState === 'playing' || gameState === 'paused')) {
+                togglePause();
+            }
+        });
         window.addEventListener('keyup', e => keys[e.code] = false);
-        gameCanvas.addEventListener('mousemove', e => {
-            const rect = gameCanvas.getBoundingClientRect();
-            mouse.x = e.clientX - rect.left;
-            mouse.y = e.clientY - rect.top;
-        });
-        gameCanvas.addEventListener('mousedown', e => {
-            if (e.button === 0) mouse.down = true;
-            if (e.button === 2) mouse.rightDown = true;
-        });
-        gameCanvas.addEventListener('mouseup', e => {
-            if (e.button === 0) mouse.down = false;
-            if (e.button === 2) mouse.rightDown = false;
-        });
-        gameCanvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        if (!isMobile) {
+            gameCanvas.addEventListener('mousemove', e => {
+                const rect = gameCanvas.getBoundingClientRect();
+                mouse.x = e.clientX - rect.left;
+                mouse.y = e.clientY - rect.top;
+            });
+            gameCanvas.addEventListener('mousedown', e => {
+                if (e.button === 0) mouse.down = true;
+                if (e.button === 2) mouse.rightDown = true;
+            });
+            gameCanvas.addEventListener('mouseup', e => {
+                if (e.button === 0) mouse.down = false;
+                if (e.button === 2) mouse.rightDown = false;
+            });
+            gameCanvas.addEventListener('contextmenu', e => e.preventDefault());
+        } else {
+            // Mobile touch controls
+            shootButton.addEventListener('touchstart', e => { e.preventDefault(); mouse.down = true; }, { passive: false });
+            shootButton.addEventListener('touchend', e => { e.preventDefault(); mouse.down = false; }, { passive: false });
+            chronoButton.addEventListener('touchstart', e => { e.preventDefault(); mouse.rightDown = true; }, { passive: false });
+            chronoButton.addEventListener('touchend', e => { e.preventDefault(); mouse.rightDown = false; }, { passive: false });
+
+            joystickArea.addEventListener('touchstart', handleJoystickStart, { passive: false });
+            joystickArea.addEventListener('touchmove', handleJoystickMove, { passive: false });
+            joystickArea.addEventListener('touchend', handleJoystickEnd, { passive: false });
+            joystickArea.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+        }
+        
+        function handleJoystickStart(e) {
+            e.preventDefault();
+            if (joystick.active) return;
+            const touch = e.changedTouches[0];
+            joystick.touchId = touch.identifier;
+            joystick.active = true;
+            joystick.originX = touch.clientX;
+            joystick.originY = touch.clientY;
+        }
+
+        function handleJoystickMove(e) {
+            e.preventDefault();
+            if (!joystick.active) return;
+            
+            let touch;
+            for(let t of e.changedTouches) {
+                if(t.identifier === joystick.touchId) {
+                    touch = t;
+                    break;
+                }
+            }
+            if(!touch) return;
+
+            const dx = touch.clientX - joystick.originX;
+            const dy = touch.clientY - joystick.originY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = joystickArea.offsetWidth / 4;
+
+            let clampedX, clampedY;
+            if (dist > maxDist) {
+                joystick.x = dx / dist;
+                joystick.y = dy / dist;
+                clampedX = joystick.x * maxDist;
+                clampedY = joystick.y * maxDist;
+            } else {
+                joystick.x = dx / maxDist;
+                joystick.y = dy / maxDist;
+                clampedX = dx;
+                clampedY = dy;
+            }
+            
+            joystickThumb.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+        }
+
+        function handleJoystickEnd(e) {
+            let touchEnded = false;
+            for(let t of e.changedTouches) {
+                if(t.identifier === joystick.touchId) {
+                    touchEnded = true;
+                    break;
+                }
+            }
+            if (!joystick.active || !touchEnded) return;
+            
+            joystick.active = false;
+            joystick.x = 0;
+            joystick.y = 0;
+            joystick.touchId = null;
+            joystickThumb.style.transform = `translate(0px, 0px)`;
+        }
 
 
         // Game Objects
@@ -426,6 +670,10 @@
                 } else {
                     this.updateManual(dt);
                 }
+                
+                if (isMobile && !isAIActive) {
+                    this.updateMobileAim(enemies);
+                }
 
                 this.pos = this.pos.add(this.vel.multiply(dt));
 
@@ -433,7 +681,7 @@
                 this.pos.x = Math.max(this.size, Math.min(width - this.size, this.pos.x));
                 this.pos.y = Math.max(this.size, Math.min(height - this.size, this.pos.y));
                 
-                // Common logic for both manual and AI
+                // Common logic
                 if (this.shootCooldown > 0) {
                     this.shootCooldown -= dt;
                 }
@@ -442,7 +690,7 @@
                     this.shootCooldown = 1 / this.shootRate;
                 }
                 
-                const isSlowingTime = (mouse.rightDown || (keys['Space'] && !isAIActive)) && this.chrono > 0;
+                const isSlowingTime = (mouse.rightDown || (keys['Space'] && !isAIActive && !isMobile)) && this.chrono > 0;
                  if (isSlowingTime) {
                     timeScale = 0.3;
                     this.chrono -= this.chronoUsage * dt;
@@ -462,20 +710,44 @@
                     }
                 }
             }
+            
+            updateMobileAim(enemies) {
+                let closestEnemy = null;
+                let closestEnemyDist = Infinity;
+                for (const enemy of enemies) {
+                    const dist = this.pos.subtract(enemy.pos).magnitude();
+                    if (dist < closestEnemyDist) {
+                        closestEnemyDist = dist;
+                        closestEnemy = enemy;
+                    }
+                }
+                if (closestEnemy) {
+                    mouse.x = closestEnemy.pos.x;
+                    mouse.y = closestEnemy.pos.y;
+                } else if (this.vel.magnitude() > 0.1) {
+                    mouse.x = this.pos.x + this.vel.x;
+                    mouse.y = this.pos.y + this.vel.y;
+                }
+            }
 
             updateManual(dt) {
-                 // Movement
-                let moveDir = new Vector2(0, 0);
-                if (keys['KeyW'] || keys['ArrowUp']) moveDir.y -= 1;
-                if (keys['KeyS'] || keys['ArrowDown']) moveDir.y += 1;
-                if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
-                if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
-
-                if (moveDir.magnitude() > 0) {
-                    moveDir = moveDir.normalize();
+                if (isMobile) {
+                    let moveDir = new Vector2(joystick.x, joystick.y);
                     this.vel = moveDir.multiply(this.speed);
                 } else {
-                    this.vel = new Vector2(0, 0);
+                    // Keyboard Movement
+                    let moveDir = new Vector2(0, 0);
+                    if (keys['KeyW'] || keys['ArrowUp']) moveDir.y -= 1;
+                    if (keys['KeyS'] || keys['ArrowDown']) moveDir.y += 1;
+                    if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
+                    if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
+
+                    if (moveDir.magnitude() > 0) {
+                        moveDir = moveDir.normalize();
+                        this.vel = moveDir.multiply(this.speed);
+                    } else {
+                        this.vel = new Vector2(0, 0);
+                    }
                 }
             }
 
@@ -512,9 +784,7 @@
                     const dist = this.pos.subtract(bullet.pos).magnitude();
                     if (dist < dodgeRadius) {
                         if (dist < panicRadius) panicCount++;
-                        // Steer away from the bullet
                         let repulsion = this.pos.subtract(bullet.pos);
-                        // Weight by inverse distance squared - closer bullets are much more dangerous
                         steering = steering.add(repulsion.multiply(1 / (dist * dist)));
                     }
                 }
@@ -537,7 +807,6 @@
                     if (closestOrb) {
                         steering = steering.add(closestOrb.pos.subtract(this.pos).normalize().multiply(0.8));
                     } else if (closestEnemy) {
-                        // Keep a safe distance from enemy
                         if (closestEnemyDist > 200) {
                             steering = steering.add(closestEnemy.pos.subtract(this.pos).normalize().multiply(0.5));
                         } else if (closestEnemyDist < 150) {
@@ -564,7 +833,7 @@
                 if(this.isInvincible) return;
                 this.health -= amount;
                 this.isInvincible = true;
-                this.invincibilityTimer = 0.5; // 0.5 seconds of invincibility
+                this.invincibilityTimer = 0.5;
                 createParticle(this.pos.x, this.pos.y, { count: 20, color: 'red', speed: 4, life: 40 });
                 if (this.health <= 0) {
                     gameOver();
@@ -635,7 +904,7 @@
                 this.speed = 100;
                 this.shootCooldown = 0;
                 this.shootRate = 0.5;
-                this.damage = 10; // Contact damage
+                this.damage = 10;
              }
              
              update(dt, playerPos) {
@@ -643,7 +912,6 @@
                 this.vel = dirToPlayer.multiply(this.speed);
                 this.pos = this.pos.add(this.vel.multiply(dt));
 
-                // Shooting
                 if (this.shootCooldown > 0) {
                     this.shootCooldown -= dt;
                 } else {
@@ -665,11 +933,10 @@
              }
              
              die() {
-                // Mark for removal
                 this.isDead = true;
                 score += 100;
                 createParticle(this.pos.x, this.pos.y, { count: 30, color: this.color, speed: 5 });
-                if(Math.random() < 0.1) { // 10% chance to drop an orb
+                if(Math.random() < 0.1) {
                     upgradeOrbs.push(new UpgradeOrb(this.pos.x, this.pos.y));
                 }
              }
@@ -683,7 +950,6 @@
                 ctx.rect(this.pos.x - this.size / 2, this.pos.y - this.size / 2, this.size, this.size);
                 ctx.fill();
 
-                // Health bar
                 if (this.health < this.maxHealth) {
                     const barWidth = this.size * 2;
                     const barHeight = 5;
@@ -700,7 +966,7 @@
             constructor(x,y) {
                 this.pos = new Vector2(x,y);
                 this.size = 10;
-                this.life = 10; // 10 seconds
+                this.life = 10;
                 this.collectionRadius = 60;
             }
             
@@ -716,7 +982,7 @@
 
             draw(ctx) {
                 ctx.save();
-                ctx.globalAlpha = Math.max(0, this.life / 2); // Fade out
+                ctx.globalAlpha = Math.max(0, this.life / 2);
                 const pulse = Math.sin(gameTime * 5) * 0.5 + 0.5;
                 const glow = 15 + pulse * 10;
                 
@@ -765,7 +1031,6 @@
             upgradeOrbs.forEach(o => o.update(dt * timeScale, player.pos));
 
             // Collision Detection
-            // Player bullets vs enemies
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
                 if (!b.isPlayer) continue;
@@ -781,7 +1046,6 @@
                 }
             }
             
-            // Enemy bullets vs player
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i];
                 if (b.isPlayer) continue;
@@ -793,17 +1057,15 @@
                 }
             }
 
-            // Enemies vs player
             for(let i = enemies.length - 1; i >= 0; i--) {
                 const e = enemies[i];
                 const dist = e.pos.subtract(player.pos).magnitude();
                 if(dist < e.size/2 + player.size/2) {
                     player.takeDamage(e.damage);
-                    e.takeDamage(1000); // Enemy also dies
+                    e.takeDamage(1000);
                 }
             }
 
-            // Player vs Upgrade Orbs
              for(let i = upgradeOrbs.length - 1; i >= 0; i--) {
                 const o = upgradeOrbs[i];
                 const dist = o.pos.subtract(player.pos).magnitude();
@@ -818,18 +1080,16 @@
             enemies = enemies.filter(e => !e.isDead);
             upgradeOrbs = upgradeOrbs.filter(o => o.life > 0);
 
-            // Next Wave
             if (enemies.length === 0) {
                 wave++;
                 spawnWave();
-                player.health = Math.min(player.maxHealth, player.health + 25); // Heal between waves
+                player.health = Math.min(player.maxHealth, player.health + 25);
             }
             
             updateUI();
         }
 
         function applyUpgrade() {
-            // Simple temporary upgrades for now
             player.health = Math.min(player.maxHealth, player.health + 10);
             score += 50;
             createParticle(player.pos.x, player.pos.y, { count: 30, color: 'lime', speed: 3, life: 60 });
@@ -861,26 +1121,14 @@
             enemies.forEach(e => e.draw(gameCtx));
             player.draw(gameCtx);
 
-            // Draw particles on top
             particles.forEach(p => {
                 if(p.color !== 'cyan' && p.color !== 'white') drawParticles(gameCtx);
             });
         }
         
-        // Background effect
-        const stars = [];
-        for (let i = 0; i < 200; i++) {
-            stars.push({
-                x: Math.random() * width,
-                y: Math.random() * height,
-                size: Math.random() * 2 + 0.5,
-                speed: Math.random() * 0.2 + 0.1
-            });
-        }
-
         function drawBackground() {
             bgCtx.globalCompositeOperation = 'source-over';
-            bgCtx.fillStyle = 'rgba(8, 10, 16, 0.2)'; // Fading trail effect
+            bgCtx.fillStyle = 'rgba(8, 10, 16, 0.2)';
             bgCtx.fillRect(0, 0, width, height);
             bgCtx.globalCompositeOperation = 'lighter';
             
@@ -909,13 +1157,41 @@
             startButton.textContent = 'REINTENTAR SIMULACIÓN';
         }
 
-        // <!-- Main Game Loop -->
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                pauseOverlay.classList.add('visible');
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                pauseOverlay.classList.remove('visible');
+                lastTime = performance.now();
+            }
+        }
+
+        function exitToMenu() {
+            gameState = 'start';
+            pauseOverlay.classList.remove('visible');
+            
+            overlayTitle.textContent = "CHRONO BREAK";
+            overlayText.textContent = "Una anomalía te ha dado el poder de controlar el tiempo. Sobrevive a las oleadas de enemigos que intentan purgarte de la realidad.";
+            finalScoreEl.style.display = 'none';
+            controlsInfo.style.display = 'block';
+            startButton.textContent = 'INICIAR SIMULACIÓN';
+            
+            gameOverlay.classList.add('visible');
+        }
+
         function gameLoop(timestamp) {
-            const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1); // Delta time in seconds, capped
+            if (gameState === 'paused') {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
             lastTime = timestamp;
-            gameTime += deltaTime;
             
             if (gameState === 'playing') {
+                gameTime += deltaTime;
                 update(deltaTime);
             }
             
@@ -935,12 +1211,15 @@
                 isAIActive = aiToggle.checked;
                 initGame();
                 gameState = 'playing';
+                lastTime = performance.now();
             }
         });
+        
+        resumeButton.addEventListener('click', togglePause);
+        exitButton.addEventListener('click', exitToMenu);
         
         requestAnimationFrame(gameLoop);
 
     </script>
 </body>
 </html>
-
