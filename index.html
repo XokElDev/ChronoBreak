@@ -81,6 +81,27 @@
             justify-content: space-between;
             align-items: center;
         }
+        
+        #mobile-pause-button {
+            display: none;
+            pointer-events: auto;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--ui-bg);
+            border: 2px solid var(--border-color);
+            color: var(--primary-glow);
+            font-size: 1.5em;
+            font-weight: bold;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            text-shadow: 0 0 5px var(--primary-glow);
+        }
+
+        body.is-mobile #mobile-pause-button.visible {
+            display: flex;
+        }
 
         #score, #wave {
             font-size: 2em;
@@ -293,6 +314,11 @@
         body.is-mobile #mobile-controls {
             display: block;
         }
+        
+        body.is-mobile #game-overlay.visible ~ #mobile-controls,
+        body.is-mobile #pause-overlay.visible ~ #mobile-controls {
+            display: none;
+        }
 
         #joystick-area {
             position: absolute;
@@ -357,6 +383,7 @@
         <div id="ui-container">
             <div id="top-ui">
                 <div id="score">SCORE: 0</div>
+                <div id="mobile-pause-button">||</div>
                 <div id="wave">WAVE: 1</div>
             </div>
             <div id="bottom-ui">
@@ -374,7 +401,7 @@
             <h1>CHRONO BREAK</h1>
             <p>Una anomalía te ha dado el poder de controlar el tiempo. Sobrevive a las oleadas de enemigos que intentan purgarte de la realidad.</p>
             <div id="controls-info">
-                <span>WASD</span> / <span>Flechas</span>: Moverse | <span>Click Izq</span>: Disparar | <span>Click Der</span> / <span>Espacio</span>: Ralentizar Tiempo
+                <span>WASD</span> / <span>Flechas</span>: Moverse | <span>Click Izq</span>: Disparar | <span>Click Der</span> / <span>Espacio</span>: Ralentizar Tiempo | <span>P</span>: Pausa
             </div>
             <div id="ai-toggle-container">
                 <input type="checkbox" id="ai-toggle">
@@ -451,6 +478,7 @@
         const joystickThumb = document.getElementById('joystick-thumb');
         const shootButton = document.getElementById('shoot-button');
         const chronoButton = document.getElementById('chrono-button');
+        const mobilePauseButton = document.getElementById('mobile-pause-button');
 
 
         // <!-- Game State -->
@@ -507,6 +535,8 @@
             joystickArea.addEventListener('touchmove', handleJoystickMove, { passive: false });
             joystickArea.addEventListener('touchend', handleJoystickEnd, { passive: false });
             joystickArea.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+            
+            mobilePauseButton.addEventListener('click', togglePause);
         }
         
         function handleJoystickStart(e) {
@@ -1148,6 +1178,7 @@
 
         function gameOver() {
             gameState = 'gameover';
+            if (isMobile) mobilePauseButton.classList.remove('visible');
             gameOverlay.classList.add('visible');
             overlayTitle.textContent = "REALIDAD ROTA";
             overlayText.textContent = "Has sido purgado del sistema. La anomalía ha sido contenida.";
@@ -1160,9 +1191,11 @@
         function togglePause() {
             if (gameState === 'playing') {
                 gameState = 'paused';
+                if (isMobile) mobilePauseButton.classList.remove('visible');
                 pauseOverlay.classList.add('visible');
             } else if (gameState === 'paused') {
                 gameState = 'playing';
+                 if (isMobile) mobilePauseButton.classList.add('visible');
                 pauseOverlay.classList.remove('visible');
                 lastTime = performance.now();
             }
@@ -1170,6 +1203,7 @@
 
         function exitToMenu() {
             gameState = 'start';
+            if (isMobile) mobilePauseButton.classList.remove('visible');
             pauseOverlay.classList.remove('visible');
             
             overlayTitle.textContent = "CHRONO BREAK";
@@ -1211,6 +1245,7 @@
                 isAIActive = aiToggle.checked;
                 initGame();
                 gameState = 'playing';
+                if (isMobile) mobilePauseButton.classList.add('visible');
                 lastTime = performance.now();
             }
         });
@@ -1223,3 +1258,4 @@
     </script>
 </body>
 </html>
+
