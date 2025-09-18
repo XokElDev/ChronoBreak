@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono Break</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-glow: #00ffff;
+            --secondary-glow: #ff00ff;
+            --danger-glow: #ff4141;
+            --background-color: #080a10;
+            --text-color: #e0e0e0;
+            --ui-bg: rgba(10, 20, 40, 0.85);
+            --border-color: rgba(0, 255, 255, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 0 35px var(--primary-glow), 0 0 15px var(--secondary-glow) inset;
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            background-color: transparent;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 5px var(--primary-glow);
+        }
+
+        #top-ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #score, #wave {
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        #bottom-ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+        }
+
+        #health-bar-container, #chrono-bar-container {
+            background: var(--ui-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px;
+            flex-grow: 1;
+            backdrop-filter: blur(5px);
+        }
+
+        .bar-label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .bar {
+            width: 100%;
+            height: 20px;
+            background-color: rgba(0,0,0,0.4);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #1aff1a, #00b300);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 8px #1aff1a;
+        }
+
+        #chrono-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--secondary-glow), var(--primary-glow));
+            transition: width 0.1s linear;
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+        
+        #game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        #game-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #game-overlay h1 {
+            font-size: 5em;
+            margin: 0;
+            text-shadow: 0 0 15px var(--primary-glow), 0 0 25px var(--secondary-glow);
+        }
+
+        #game-overlay p {
+            font-size: 1.5em;
+            max-width: 60%;
+        }
+
+        #game-overlay button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5em;
+            font-weight: 700;
+            padding: 15px 30px;
+            margin-top: 30px;
+            border: 2px solid var(--primary-glow);
+            border-radius: 10px;
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--primary-glow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px var(--primary-glow);
+            box-shadow: 0 0 10px var(--primary-glow) inset, 0 0 5px var(--primary-glow);
+        }
+
+        #game-overlay button:hover {
+            background: rgba(0, 255, 255, 0.3);
+            color: white;
+            box-shadow: 0 0 20px var(--primary-glow) inset, 0 0 15px var(--primary-glow);
+            transform: scale(1.05);
+        }
+
+        #controls-info {
+            margin-top: 1em;
+            font-size: 1.2em;
+            background: var(--ui-bg);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        #controls-info span {
+            display: inline-block;
+            background: var(--border-color);
+            color: var(--background-color);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        #ai-toggle-container {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.2em;
+            background: var(--ui-bg);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        #ai-toggle {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="background-canvas"></canvas>
+        <canvas id="game-canvas"></canvas>
+        <div id="ui-container">
+            <div id="top-ui">
+                <div id="score">SCORE: 0</div>
+                <div id="wave">WAVE: 1</div>
+            </div>
+            <div id="bottom-ui">
+                <div id="health-bar-container">
+                    <div class="bar-label">HEALTH</div>
+                    <div class="bar"><div id="health-bar"></div></div>
+                </div>
+                <div id="chrono-bar-container">
+                    <div class="bar-label">CHRONO POWER</div>
+                    <div class="bar"><div id="chrono-bar"></div></div>
+                </div>
+            </div>
+        </div>
+        <div id="game-overlay" class="visible">
+            <h1>CHRONO BREAK</h1>
+            <p>Una anomalía te ha dado el poder de controlar el tiempo. Sobrevive a las oleadas de enemigos que intentan purgarte de la realidad.</p>
+            <div id="controls-info">
+                <span>WASD</span> / <span>Flechas</span>: Moverse | <span>Click Izq</span>: Disparar | <span>Click Der</span> / <span>Espacio</span>: Ralentizar Tiempo
+            </div>
+            <div id="ai-toggle-container">
+                <input type="checkbox" id="ai-toggle">
+                <label for="ai-toggle">Activar Piloto Automático</label>
+            </div>
+            <button id="start-button">INICIAR SIMULACIÓN</button>
+            <div id="final-score" style="display:none; font-size: 2em; margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // <!-- Game Engine Initialization -->
+        const gameCanvas = document.getElementById('game-canvas');
+        const gameCtx = gameCanvas.getContext('2d');
+        const bgCanvas = document.getElementById('background-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        const gameContainer = document.getElementById('game-container');
+        
+        let width, height;
+
+        function resizeCanvas() {
+            const rect = gameContainer.getBoundingClientRect();
+            width = gameCanvas.width = bgCanvas.width = rect.width;
+            height = gameCanvas.height = bgCanvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // <!-- UI Elements -->
+        const scoreEl = document.getElementById('score');
+        const waveEl = document.getElementById('wave');
+        const healthBarEl = document.getElementById('health-bar');
+        const chronoBarEl = document.getElementById('chrono-bar');
+        const gameOverlay = document.getElementById('game-overlay');
+        const startButton = document.getElementById('start-button');
+        const overlayTitle = gameOverlay.querySelector('h1');
+        const overlayText = gameOverlay.querySelector('p');
+        const finalScoreEl = document.getElementById('final-score');
+        const controlsInfo = document.getElementById('controls-info');
+        const aiToggle = document.getElementById('ai-toggle');
+
+        // <!-- Game State -->
+        let gameState = 'start'; // 'start', 'playing', 'gameover'
+        let isAIActive = false;
+        let score = 0;
+        let wave = 1;
+        let gameTime = 0;
+        let timeScale = 1;
+        let lastTime = 0;
+        
+        // Input Handling
+        const keys = {};
+        const mouse = { x: 0, y: 0, down: false, rightDown: false };
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        gameCanvas.addEventListener('mousemove', e => {
+            const rect = gameCanvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+        gameCanvas.addEventListener('mousedown', e => {
+            if (e.button === 0) mouse.down = true;
+            if (e.button === 2) mouse.rightDown = true;
+        });
+        gameCanvas.addEventListener('mouseup', e => {
+            if (e.button === 0) mouse.down = false;
+            if (e.button === 2) mouse.rightDown = false;
+        });
+        gameCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+
+        // Game Objects
+        let player;
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+        let upgradeOrbs = [];
+
+        class Vector2 {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+            add(vec) { return new Vector2(this.x + vec.x, this.y + vec.y); }
+            subtract(vec) { return new Vector2(this.x - vec.x, this.y - vec.y); }
+            multiply(scalar) { return new Vector2(this.x * scalar, this.y * scalar); }
+            magnitude() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() {
+                const mag = this.magnitude();
+                return mag > 0 ? new Vector2(this.x / mag, this.y / mag) : new Vector2(0, 0);
+            }
+        }
+
+        // <!-- Particle System -->
+        function createParticle(x, y, options) {
+            const defaults = {
+                count: 5,
+                color: 'white',
+                life: 30,
+                speed: 3,
+                size: 2,
+                spread: Math.PI * 2,
+                angle: 0
+            };
+            const config = { ...defaults, ...options };
+
+            for (let i = 0; i < config.count; i++) {
+                const angle = (config.angle - config.spread / 2) + Math.random() * config.spread;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * Math.random() * config.speed,
+                    vy: Math.sin(angle) * Math.random() * config.speed,
+                    life: config.life + Math.random() * config.life * 0.5,
+                    maxLife: config.life * 1.5,
+                    color: config.color,
+                    size: Math.random() * config.size + 1
+                });
+            }
+        }
+        
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt * 60; // Assuming 60fps base for life
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawParticles(ctx) {
+            for (const p of particles) {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life / p.maxLife;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+
+        // <!-- Player Class -->
+        class Player {
+            constructor(x, y) {
+                this.pos = new Vector2(x, y);
+                this.vel = new Vector2(0, 0);
+                this.size = 15;
+                this.speed = 250;
+                this.maxHealth = 100;
+                this.health = this.maxHealth;
+                this.maxChrono = 100;
+                this.chrono = this.maxChrono;
+                this.chronoUsage = 35; // Per second
+                this.chronoRegen = 10; // Per second
+                this.shootCooldown = 0;
+                this.shootRate = 5; // Bullets per second
+                this.damage = 10;
+                this.isInvincible = false;
+                this.invincibilityTimer = 0;
+            }
+
+            update(dt, enemies, bullets, orbs) {
+                if (isAIActive) {
+                    this.updateAI(dt, enemies, bullets, orbs);
+                } else {
+                    this.updateManual(dt);
+                }
+
+                this.pos = this.pos.add(this.vel.multiply(dt));
+
+                // Boundaries
+                this.pos.x = Math.max(this.size, Math.min(width - this.size, this.pos.x));
+                this.pos.y = Math.max(this.size, Math.min(height - this.size, this.pos.y));
+                
+                // Common logic for both manual and AI
+                if (this.shootCooldown > 0) {
+                    this.shootCooldown -= dt;
+                }
+                if (mouse.down && this.shootCooldown <= 0) {
+                    this.shoot();
+                    this.shootCooldown = 1 / this.shootRate;
+                }
+                
+                const isSlowingTime = (mouse.rightDown || (keys['Space'] && !isAIActive)) && this.chrono > 0;
+                 if (isSlowingTime) {
+                    timeScale = 0.3;
+                    this.chrono -= this.chronoUsage * dt;
+                } else {
+                    timeScale = 1;
+                    if (this.chrono < this.maxChrono) {
+                        this.chrono += this.chronoRegen * dt;
+                    }
+                }
+                this.chrono = Math.max(0, Math.min(this.maxChrono, this.chrono));
+
+                // Invincibility
+                if(this.isInvincible) {
+                    this.invincibilityTimer -= dt;
+                    if(this.invincibilityTimer <= 0) {
+                        this.isInvincible = false;
+                    }
+                }
+            }
+
+            updateManual(dt) {
+                 // Movement
+                let moveDir = new Vector2(0, 0);
+                if (keys['KeyW'] || keys['ArrowUp']) moveDir.y -= 1;
+                if (keys['KeyS'] || keys['ArrowDown']) moveDir.y += 1;
+                if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
+                if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
+
+                if (moveDir.magnitude() > 0) {
+                    moveDir = moveDir.normalize();
+                    this.vel = moveDir.multiply(this.speed);
+                } else {
+                    this.vel = new Vector2(0, 0);
+                }
+            }
+
+            updateAI(dt, enemies, bullets, orbs) {
+                // AI LOGIC
+                let steering = new Vector2(0, 0);
+                let closestEnemy = null;
+                let closestEnemyDist = Infinity;
+
+                // 1. Find closest enemy for targeting
+                for (const enemy of enemies) {
+                    const dist = this.pos.subtract(enemy.pos).magnitude();
+                    if (dist < closestEnemyDist) {
+                        closestEnemyDist = dist;
+                        closestEnemy = enemy;
+                    }
+                }
+                
+                if (closestEnemy) {
+                    mouse.x = closestEnemy.pos.x;
+                    mouse.y = closestEnemy.pos.y;
+                    mouse.down = true;
+                } else {
+                    mouse.down = false;
+                }
+
+                // 2. Dodge incoming bullets
+                let panicCount = 0;
+                const panicRadius = this.size * 3;
+                const dodgeRadius = this.size * 8;
+
+                for (const bullet of bullets) {
+                    if (bullet.isPlayer) continue;
+                    const dist = this.pos.subtract(bullet.pos).magnitude();
+                    if (dist < dodgeRadius) {
+                        if (dist < panicRadius) panicCount++;
+                        // Steer away from the bullet
+                        let repulsion = this.pos.subtract(bullet.pos);
+                        // Weight by inverse distance squared - closer bullets are much more dangerous
+                        steering = steering.add(repulsion.multiply(1 / (dist * dist)));
+                    }
+                }
+
+                // 3. Use Chrono power if in panic
+                mouse.rightDown = (panicCount >= 3 && this.chrono > 20);
+
+                // 4. Seek orbs or attack enemies
+                if (steering.magnitude() < 0.1) { // If not busy dodging
+                    let closestOrb = null;
+                    let closestOrbDist = Infinity;
+                    for (const orb of orbs) {
+                        const dist = this.pos.subtract(orb.pos).magnitude();
+                        if (dist < closestOrbDist) {
+                            closestOrbDist = dist;
+                            closestOrb = orb;
+                        }
+                    }
+
+                    if (closestOrb) {
+                        steering = steering.add(closestOrb.pos.subtract(this.pos).normalize().multiply(0.8));
+                    } else if (closestEnemy) {
+                        // Keep a safe distance from enemy
+                        if (closestEnemyDist > 200) {
+                            steering = steering.add(closestEnemy.pos.subtract(this.pos).normalize().multiply(0.5));
+                        } else if (closestEnemyDist < 150) {
+                            steering = steering.add(this.pos.subtract(closestEnemy.pos).normalize().multiply(0.5));
+                        }
+                    }
+                }
+
+                // 5. Apply movement
+                if (steering.magnitude() > 0) {
+                    this.vel = steering.normalize().multiply(this.speed);
+                } else {
+                    this.vel = new Vector2(0,0);
+                }
+            }
+
+            shoot() {
+                const angle = Math.atan2(mouse.y - this.pos.y, mouse.x - this.pos.x);
+                bullets.push(new Bullet(this.pos.x, this.pos.y, angle, true, this.damage));
+                createParticle(this.pos.x, this.pos.y, { count: 2, color: 'cyan', speed: 1, life: 15, angle: angle + Math.PI, spread: 0.5 });
+            }
+
+            takeDamage(amount) {
+                if(this.isInvincible) return;
+                this.health -= amount;
+                this.isInvincible = true;
+                this.invincibilityTimer = 0.5; // 0.5 seconds of invincibility
+                createParticle(this.pos.x, this.pos.y, { count: 20, color: 'red', speed: 4, life: 40 });
+                if (this.health <= 0) {
+                    gameOver();
+                }
+            }
+            
+            draw(ctx) {
+                if (this.isInvincible && Math.floor(this.invincibilityTimer * 20) % 2 === 0) {
+                    return; // Flicker effect
+                }
+
+                const angle = Math.atan2(mouse.y - this.pos.y, mouse.x - this.pos.x);
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                ctx.rotate(angle);
+                
+                // Body
+                ctx.fillStyle = 'white';
+                ctx.shadowColor = 'cyan';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(this.size, 0);
+                ctx.lineTo(-this.size / 2, -this.size / 2);
+                ctx.lineTo(-this.size / 2, this.size / 2);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // <!-- Bullet Class -->
+        class Bullet {
+            constructor(x, y, angle, isPlayer, damage = 10) {
+                this.pos = new Vector2(x, y);
+                this.vel = new Vector2(Math.cos(angle), Math.sin(angle)).multiply(isPlayer ? 800 : 300);
+                this.size = isPlayer ? 5 : 4;
+                this.isPlayer = isPlayer;
+                this.color = isPlayer ? 'cyan' : 'magenta';
+                this.damage = damage;
+            }
+
+            update(dt) {
+                this.pos = this.pos.add(this.vel.multiply(dt));
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // <!-- Enemy Classes -->
+        class Enemy {
+             constructor(x,y) {
+                this.pos = new Vector2(x,y);
+                this.vel = new Vector2(0,0);
+                this.size = 20;
+                this.health = 30;
+                this.maxHealth = 30;
+                this.color = '#ff00ff';
+                this.speed = 100;
+                this.shootCooldown = 0;
+                this.shootRate = 0.5;
+                this.damage = 10; // Contact damage
+             }
+             
+             update(dt, playerPos) {
+                const dirToPlayer = playerPos.subtract(this.pos).normalize();
+                this.vel = dirToPlayer.multiply(this.speed);
+                this.pos = this.pos.add(this.vel.multiply(dt));
+
+                // Shooting
+                if (this.shootCooldown > 0) {
+                    this.shootCooldown -= dt;
+                } else {
+                    this.shoot(dirToPlayer);
+                    this.shootCooldown = 1 / this.shootRate + Math.random();
+                }
+             }
+             
+             shoot(direction) {
+                 const angle = Math.atan2(direction.y, direction.x);
+                 bullets.push(new Bullet(this.pos.x, this.pos.y, angle, false, 10));
+             }
+
+             takeDamage(amount) {
+                 this.health -= amount;
+                 if(this.health <= 0) {
+                     this.die();
+                 }
+             }
+             
+             die() {
+                // Mark for removal
+                this.isDead = true;
+                score += 100;
+                createParticle(this.pos.x, this.pos.y, { count: 30, color: this.color, speed: 5 });
+                if(Math.random() < 0.1) { // 10% chance to drop an orb
+                    upgradeOrbs.push(new UpgradeOrb(this.pos.x, this.pos.y));
+                }
+             }
+
+             draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 15;
+                
+                ctx.beginPath();
+                ctx.rect(this.pos.x - this.size / 2, this.pos.y - this.size / 2, this.size, this.size);
+                ctx.fill();
+
+                // Health bar
+                if (this.health < this.maxHealth) {
+                    const barWidth = this.size * 2;
+                    const barHeight = 5;
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(this.pos.x - barWidth / 2, this.pos.y - this.size, barWidth, barHeight);
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(this.pos.x - barWidth / 2, this.pos.y - this.size, barWidth * (this.health / this.maxHealth), barHeight);
+                }
+                ctx.shadowBlur = 0;
+             }
+        }
+        
+        class UpgradeOrb {
+            constructor(x,y) {
+                this.pos = new Vector2(x,y);
+                this.size = 10;
+                this.life = 10; // 10 seconds
+                this.collectionRadius = 60;
+            }
+            
+            update(dt, playerPos) {
+                this.life -= dt;
+                
+                const distToPlayer = playerPos.subtract(this.pos).magnitude();
+                if(distToPlayer < this.collectionRadius) {
+                    const dir = playerPos.subtract(this.pos).normalize();
+                    this.pos = this.pos.add(dir.multiply(300 * dt));
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life / 2); // Fade out
+                const pulse = Math.sin(gameTime * 5) * 0.5 + 0.5;
+                const glow = 15 + pulse * 10;
+                
+                ctx.fillStyle = 'lime';
+                ctx.shadowColor = 'lime';
+                ctx.shadowBlur = glow;
+                
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+
+        // <!-- Game Logic -->
+        function initGame() {
+            score = 0;
+            wave = 1;
+            player = new Player(width / 2, height / 2);
+            bullets = [];
+            enemies = [];
+            particles = [];
+            upgradeOrbs = [];
+            spawnWave();
+        }
+
+        function spawnWave() {
+            const numEnemies = 2 + wave * 2;
+            for (let i = 0; i < numEnemies; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.max(width, height) * 0.7;
+                const x = width / 2 + Math.cos(angle) * dist;
+                const y = height / 2 + Math.sin(angle) * dist;
+                enemies.push(new Enemy(x, y));
+            }
+        }
+
+        function update(dt) {
+            player.update(dt, enemies, bullets, upgradeOrbs);
+            updateParticles(dt * timeScale);
+            
+            bullets.forEach(b => b.update(dt * timeScale));
+            enemies.forEach(e => e.update(dt * timeScale, player.pos));
+            upgradeOrbs.forEach(o => o.update(dt * timeScale, player.pos));
+
+            // Collision Detection
+            // Player bullets vs enemies
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                if (!b.isPlayer) continue;
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
+                    const dist = b.pos.subtract(e.pos).magnitude();
+                    if (dist < b.size + e.size / 2) {
+                        e.takeDamage(b.damage);
+                        bullets.splice(i, 1);
+                        createParticle(b.pos.x, b.pos.y, {count: 5, color: b.color, speed: 2, size: 2});
+                        break;
+                    }
+                }
+            }
+            
+            // Enemy bullets vs player
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                if (b.isPlayer) continue;
+                const dist = b.pos.subtract(player.pos).magnitude();
+                if (dist < b.size + player.size/2) {
+                    player.takeDamage(b.damage);
+                    bullets.splice(i, 1);
+                    break;
+                }
+            }
+
+            // Enemies vs player
+            for(let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dist = e.pos.subtract(player.pos).magnitude();
+                if(dist < e.size/2 + player.size/2) {
+                    player.takeDamage(e.damage);
+                    e.takeDamage(1000); // Enemy also dies
+                }
+            }
+
+            // Player vs Upgrade Orbs
+             for(let i = upgradeOrbs.length - 1; i >= 0; i--) {
+                const o = upgradeOrbs[i];
+                const dist = o.pos.subtract(player.pos).magnitude();
+                if(dist < o.size + player.size/2) {
+                    applyUpgrade();
+                    upgradeOrbs.splice(i, 1);
+                }
+            }
+            
+            // Cleanup
+            bullets = bullets.filter(b => b.pos.x > -10 && b.pos.x < width + 10 && b.pos.y > -10 && b.pos.y < height + 10);
+            enemies = enemies.filter(e => !e.isDead);
+            upgradeOrbs = upgradeOrbs.filter(o => o.life > 0);
+
+            // Next Wave
+            if (enemies.length === 0) {
+                wave++;
+                spawnWave();
+                player.health = Math.min(player.maxHealth, player.health + 25); // Heal between waves
+            }
+            
+            updateUI();
+        }
+
+        function applyUpgrade() {
+            // Simple temporary upgrades for now
+            player.health = Math.min(player.maxHealth, player.health + 10);
+            score += 50;
+            createParticle(player.pos.x, player.pos.y, { count: 30, color: 'lime', speed: 3, life: 60 });
+        }
+
+        function updateUI() {
+            scoreEl.textContent = `SCORE: ${score}`;
+            waveEl.textContent = `WAVE: ${wave}`;
+            healthBarEl.style.width = `${(player.health / player.maxHealth) * 100}%`;
+            chronoBarEl.style.width = `${(player.chrono / player.maxChrono) * 100}%`;
+        }
+
+        function draw() {
+            gameCtx.clearRect(0, 0, width, height);
+
+            if (timeScale < 1) {
+                gameCtx.save();
+                gameCtx.globalAlpha = 0.2;
+                gameCtx.fillStyle = 'magenta';
+                gameCtx.fillRect(0,0,width,height);
+                gameCtx.restore();
+            }
+
+            particles.forEach(p => {
+                if(p.color === 'cyan' || p.color === 'white') drawParticles(gameCtx);
+            });
+            upgradeOrbs.forEach(o => o.draw(gameCtx));
+            bullets.forEach(b => b.draw(gameCtx));
+            enemies.forEach(e => e.draw(gameCtx));
+            player.draw(gameCtx);
+
+            // Draw particles on top
+            particles.forEach(p => {
+                if(p.color !== 'cyan' && p.color !== 'white') drawParticles(gameCtx);
+            });
+        }
+        
+        // Background effect
+        const stars = [];
+        for (let i = 0; i < 200; i++) {
+            stars.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 0.2 + 0.1
+            });
+        }
+
+        function drawBackground() {
+            bgCtx.globalCompositeOperation = 'source-over';
+            bgCtx.fillStyle = 'rgba(8, 10, 16, 0.2)'; // Fading trail effect
+            bgCtx.fillRect(0, 0, width, height);
+            bgCtx.globalCompositeOperation = 'lighter';
+            
+            for (const star of stars) {
+                star.y += star.speed * timeScale;
+                if (star.y > height) {
+                    star.y = 0;
+                    star.x = Math.random() * width;
+                }
+                
+                bgCtx.fillStyle = `rgba(200, 225, 255, ${star.size / 2.5})`;
+                bgCtx.beginPath();
+                bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+            gameOverlay.classList.add('visible');
+            overlayTitle.textContent = "REALIDAD ROTA";
+            overlayText.textContent = "Has sido purgado del sistema. La anomalía ha sido contenida.";
+            finalScoreEl.textContent = `PUNTUACIÓN FINAL: ${score}`;
+            finalScoreEl.style.display = 'block';
+            controlsInfo.style.display = 'none';
+            startButton.textContent = 'REINTENTAR SIMULACIÓN';
+        }
+
+        // <!-- Main Game Loop -->
+        function gameLoop(timestamp) {
+            const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1); // Delta time in seconds, capped
+            lastTime = timestamp;
+            gameTime += deltaTime;
+            
+            if (gameState === 'playing') {
+                update(deltaTime);
+            }
+            
+            drawBackground();
+            if (gameState !== 'start') {
+                draw();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        startButton.addEventListener('click', () => {
+            gameOverlay.classList.remove('visible');
+            finalScoreEl.style.display = 'none';
+            controlsInfo.style.display = 'block';
+            if (gameState === 'start' || gameState === 'gameover') {
+                isAIActive = aiToggle.checked;
+                initGame();
+                gameState = 'playing';
+            }
+        });
+        
+        requestAnimationFrame(gameLoop);
+
+    </script>
+</body>
+</html>
+
